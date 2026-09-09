@@ -18,47 +18,54 @@ def check_youtube():
         saved_state = ""
 
     try:
-        playlist_url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId={UPLOADS_PLAYLIST_ID}&maxResults=1&key={YOUTUBE_API_KEY}"
+        playlist_url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId={UPLOADS_PLAYLIST_ID}&maxResults=3&key={YOUTUBE_API_KEY}"
         playlist_resp = requests.get(playlist_url).json()
 
         if "items" not in playlist_resp or not playlist_resp["items"]:
             return
             
-        snippet = playlist_resp["items"][0]["snippet"]
-        latest_video_id = snippet["resourceId"]["videoId"]
-        title = snippet["title"]
-        author = snippet["channelTitle"]
-        link = f"https://www.youtube.com/watch?v={latest_video_id}"
+        for item in playlist_resp["items"]:
+            snippet = item["snippet"]
+            latest_video_id = snippet["resourceId"]["videoId"]
+            title = snippet["title"]
+            author = snippet["channelTitle"]
+            link = f"https://www.youtube.com/watch?v={latest_video_id}"
 
-        api_url = f"https://www.googleapis.com/youtube/v3/videos?part=snippet&id={latest_video_id}&key={YOUTUBE_API_KEY}"
-        api_resp = requests.get(api_url).json()
+            api_url = f"https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id={latest_video_id}&key={YOUTUBE_API_KEY}"
+            api_resp = requests.get(api_url).json()
 
-        if "items" not in api_resp or not api_resp["items"]:
-            return 
+            if "items" not in api_resp or not api_resp["items"]:
+                continue 
 
-        video_snippet = api_resp["items"][0]["snippet"]
-        live_status = video_snippet.get("liveBroadcastContent", "none") 
-        thumbnail_url = f"https://img.youtube.com/vi/{latest_video_id}/maxresdefault.jpg"
+            video_data = api_resp["items"][0]
+            video_snippet = video_data["snippet"]
+            live_status = video_snippet.get("liveBroadcastContent", "none") 
+            thumbnail_url = f"https://img.youtube.com/vi/{latest_video_id}/maxresdefault.jpg"
 
-        current_state = f"{latest_video_id},{live_status}"
+            current_state = f"{latest_video_id},{live_status}"
 
-        if current_state != saved_state:
-            if saved_state == "":
-                print(f"Tracking initialized on '{title}'. No ping sent.")
-                with open("last_video.txt", "w") as f:
-                    f.write(current_state)
-            else:
-                print(f"Status change detected: {title} is now {live_status}")
+            if current_state != saved_state:
+                if saved_state == "":
+                    print(f"Tracking initialized on '{title}'. No ping sent.")
+                    with open("last_video.txt", "w") as f:
+                        f.write(current_state)
+                    return
+                
+                print(f"New content detected: {title} | Status: {live_status}")
                 
                 if live_status == "upcoming":
-                    status_text = f"📅 {author} scheduled a new stream!"
+                    status_text = f"📅 {author} scheduled a new stream/premiere!"
                     embed_color = 16753920
                 elif live_status == "live":
                     status_text = f"🔴 {author} just went LIVE!"
                     embed_color = 16711680
                 else:
-                    status_text = f"🔵 {author} uploaded a new video!"
-                    embed_color = 3447003
+                    if "#shorts" in title.lower() or "#short" in title.lower():
+                        status_text = f"📱 {author} uploaded a new YouTube Short!"
+                        embed_color = 16711680
+                    else:
+                        status_text = f"🔵 {author} uploaded a new video!"
+                        embed_color = 3447003
 
                 message = {
                     "content": f"@everyone {status_text}",
@@ -80,14 +87,13 @@ def check_youtube():
                 
                 if DISCORD_WEBHOOK_URL:
                     requests.post(DISCORD_WEBHOOK_URL, json=message)
-                    print(f"Sent {live_status} embed to Discord.")
-                else:
-                    print("ERROR: Webhook is missing from .env.")
-
+                    print(f"Sent notification for: {title}")
+                
                 with open("last_video.txt", "w") as f:
                     f.write(current_state)
-        else:
-            print("Checked: No status changes.")
+                break 
+            else:
+                break
                 
     except Exception as e:
         print(f"Error checking YouTube: {e}")
@@ -95,7 +101,7 @@ def check_youtube():
 if __name__ == "__main__":
     print(f"Webhook loaded: {bool(DISCORD_WEBHOOK_URL)}")
     print(f"YouTube API Key loaded: {bool(YOUTUBE_API_KEY)}")
-    print("Bot is tracking channel status...")
+    print("Bot is tracking channel status (Fast mode)...")
     while True:
         check_youtube()
         time.sleep(60)
