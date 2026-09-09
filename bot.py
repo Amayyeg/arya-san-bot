@@ -22,6 +22,7 @@ def check_youtube():
         playlist_resp = requests.get(playlist_url).json()
 
         if "items" not in playlist_resp or not playlist_resp["items"]:
+            print("Debug: No items found in YouTube playlist response.")
             return
             
         for item in playlist_resp["items"]:
@@ -43,15 +44,16 @@ def check_youtube():
             thumbnail_url = f"https://img.youtube.com/vi/{latest_video_id}/maxresdefault.jpg"
 
             current_state = f"{latest_video_id},{live_status}"
+            print(f"Debug: Checked video '{title}' | Current ID: {current_state} | Saved ID: {saved_state}")
 
             if current_state != saved_state:
                 if saved_state == "":
-                    print(f"Tracking initialized on '{title}'. No ping sent.")
+                    print(f"Tracking initialized on '{title}'. Saving state without ping.")
                     with open("last_video.txt", "w") as f:
                         f.write(current_state)
                     return
                 
-                print(f"New content detected: {title} | Status: {live_status}")
+                print(f"New content detected! Sending to Discord...")
                 
                 if live_status == "upcoming":
                     status_text = f"📅 {author} scheduled a new stream/premiere!"
@@ -86,13 +88,17 @@ def check_youtube():
                 }
                 
                 if DISCORD_WEBHOOK_URL:
-                    requests.post(DISCORD_WEBHOOK_URL, json=message)
-                    print(f"Sent notification for: {title}")
+                    response = requests.post(DISCORD_WEBHOOK_URL, json=message)
+                    print(f"Discord Response Status: {response.status_code}")
+                    print(f"Discord Response Body: {response.text}")
+                else:
+                    print("ERROR: Webhook URL is missing.")
                 
                 with open("last_video.txt", "w") as f:
                     f.write(current_state)
                 break 
             else:
+                print("Debug: Latest video matches saved state. No new updates.")
                 break
                 
     except Exception as e:
@@ -101,7 +107,7 @@ def check_youtube():
 if __name__ == "__main__":
     print(f"Webhook loaded: {bool(DISCORD_WEBHOOK_URL)}")
     print(f"YouTube API Key loaded: {bool(YOUTUBE_API_KEY)}")
-    print("Bot is tracking channel status (Fast mode)...")
+    print("Bot is tracking channel status (Debug mode)...")
     while True:
         check_youtube()
         time.sleep(60)
