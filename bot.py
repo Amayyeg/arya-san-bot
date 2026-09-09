@@ -98,4 +98,4 @@ if __name__ == "__main__":
     print("Bot is tracking channel status...")
     while True:
         check_youtube()
-        time.sleep(300)
+        time.sleep(60)
