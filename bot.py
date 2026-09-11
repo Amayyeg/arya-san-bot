@@ -126,4 +126,6 @@ if __name__ == "__main__":
     print("Bot is tracking channel status (Stream-Fix Mode)...")
     while True:
         check_youtube()
+        current_time = time.strftime("%I:%M:%S %p")
+        print(f"[{current_time}] Channel checked. No updates. Waiting 60s...")
         time.sleep(60)
