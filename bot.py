@@ -8,7 +8,16 @@ load_dotenv()
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 YOUTUBE_CHANNEL_ID = "UC4ZScRxLikYf82B5CZ_ZZJQ"
-UPLOADS_PLAYLIST_ID = YOUTUBE_CHANNEL_ID.replace("UC", "UU", 1)
+
+def get_uploads_playlist_id():
+    try:
+        channel_url = f"https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id={YOUTUBE_CHANNEL_ID}&key={YOUTUBE_API_KEY}"
+        resp = requests.get(channel_url).json()
+        if "items" in resp and resp["items"]:
+            return resp["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
+    except Exception as e:
+        print(f"Error fetching channel playlist: {e}")
+    return YOUTUBE_CHANNEL_ID.replace("UC", "UU", 1)
 
 def check_youtube():
     if os.path.exists("last_video.txt"):
@@ -18,11 +27,12 @@ def check_youtube():
         saved_state = ""
 
     try:
-        playlist_url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId={UPLOADS_PLAYLIST_ID}&maxResults=3&key={YOUTUBE_API_KEY}"
+        uploads_playlist_id = get_uploads_playlist_id()
+        playlist_url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId={uploads_playlist_id}&maxResults=3&key={YOUTUBE_API_KEY}"
         playlist_resp = requests.get(playlist_url).json()
 
         if "items" not in playlist_resp or not playlist_resp["items"]:
-            print("Debug: No items found in YouTube playlist response.")
+            print(f"Debug: Playlist {uploads_playlist_id} returned no items.")
             return
             
         for item in playlist_resp["items"]:
@@ -44,7 +54,6 @@ def check_youtube():
             thumbnail_url = f"https://img.youtube.com/vi/{latest_video_id}/maxresdefault.jpg"
 
             current_state = f"{latest_video_id},{live_status}"
-            print(f"Debug: Checked video '{title}' | Current ID: {current_state} | Saved ID: {saved_state}")
 
             if current_state != saved_state:
                 if saved_state == "":
@@ -53,6 +62,15 @@ def check_youtube():
                         f.write(current_state)
                     return
                 
+                saved_id = saved_state.split(",")[0] if "," in saved_state else ""
+                saved_status = saved_state.split(",")[1] if "," in saved_state else ""
+                
+                if latest_video_id == saved_id and live_status == "none" and saved_status in ["live", "upcoming"]:
+                    print(f"Stream '{title}' ended. Updating state silently.")
+                    with open("last_video.txt", "w") as f:
+                        f.write(current_state)
+                    break
+
                 print(f"New content detected! Sending to Discord...")
                 
                 if live_status == "upcoming":
@@ -90,7 +108,6 @@ def check_youtube():
                 if DISCORD_WEBHOOK_URL:
                     response = requests.post(DISCORD_WEBHOOK_URL, json=message)
                     print(f"Discord Response Status: {response.status_code}")
-                    print(f"Discord Response Body: {response.text}")
                 else:
                     print("ERROR: Webhook URL is missing.")
                 
@@ -98,7 +115,6 @@ def check_youtube():
                     f.write(current_state)
                 break 
             else:
-                print("Debug: Latest video matches saved state. No new updates.")
                 break
                 
     except Exception as e:
@@ -107,7 +123,7 @@ def check_youtube():
 if __name__ == "__main__":
     print(f"Webhook loaded: {bool(DISCORD_WEBHOOK_URL)}")
     print(f"YouTube API Key loaded: {bool(YOUTUBE_API_KEY)}")
-    print("Bot is tracking channel status (Debug mode)...")
+    print("Bot is tracking channel status (Stream-Fix Mode)...")
     while True:
         check_youtube()
         time.sleep(60)
