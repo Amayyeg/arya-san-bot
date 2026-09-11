@@ -1,1 +1,8 @@
 .env
+last_video.txt
+__pycache__/
+*.pyc
+venv/
+.venv/
+env/
+.vscode/
