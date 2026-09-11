@@ -71,7 +71,7 @@ def check_youtube():
                         f.write(current_state)
                     break
 
-                print(f"New content detected! Sending to Discord...")
+                print(f"New content detected for '{title}'! Sending to Discord...")
                 
                 if live_status == "upcoming":
                     status_text = f"📅 {author} scheduled a new stream/premiere!"
@@ -115,6 +115,8 @@ def check_youtube():
                     f.write(current_state)
                 break 
             else:
+                current_time = time.strftime("%I:%M:%S %p")
+                print(f"[{current_time}] Checked '{title}' - No update found. No notification sent.")
                 break
                 
     except Exception as e:
@@ -126,6 +128,4 @@ if __name__ == "__main__":
     print("Bot is tracking channel status (Stream-Fix Mode)...")
     while True:
         check_youtube()
-        current_time = time.strftime("%I:%M:%S %p")
-        print(f"[{current_time}] Channel checked. No updates. Waiting 60s...")
         time.sleep(60)
